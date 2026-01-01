@@ -28,7 +28,13 @@ export default function CameraScreen() {
   const [flowState, setFlowState] = useState<CameraFlowState>("CAPTURE");
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [availableCredits, setAvailableCredits] = useState<number>(0);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch user credits on mount
+  useEffect(() => {
+    fetchUserCredits();
+  }, []);
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -38,6 +44,67 @@ export default function CameraScreen() {
       }
     };
   }, []);
+
+  // Fetch user's available credits
+  async function fetchUserCredits() {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) return;
+
+      const response = await fetch("https://api.tryonapp.in/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCredits(data.user.available_tryons || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching credits:", error);
+    }
+  }
+
+  // Check if user has credits before proceeding
+  async function checkCreditsAndProceed(action: () => void) {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        Alert.alert("Error", "Please log in again");
+        return;
+      }
+
+      const response = await fetch("https://api.tryonapp.in/auth/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const credits = data.user.available_tryons || 0;
+        setAvailableCredits(credits);
+
+        if (credits <= 0) {
+          Alert.alert(
+            "No Credits Available",
+            "You've run out of try-ons! Purchase more credits to continue creating amazing virtual try-ons.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "View Pricing",
+                onPress: () => router.push("/pricing"),
+              },
+            ]
+          );
+          return;
+        }
+
+        // User has credits, proceed with action
+        action();
+      }
+    } catch (error) {
+      console.error("Error checking credits:", error);
+      Alert.alert("Error", "Failed to check credits. Please try again.");
+    }
+  }
 
   if (!permission) {
     return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
@@ -188,7 +255,7 @@ export default function CameraScreen() {
                     {/* Select Clothes */}
                     <TouchableOpacity
                       style={styles.glassButton}
-                      onPress={() => setShowSelectModal(true)}
+                      onPress={() => checkCreditsAndProceed(() => setShowSelectModal(true))}
                     >
                       <Text style={styles.selectText}>Select Clothes</Text>
                     </TouchableOpacity>
@@ -204,7 +271,7 @@ export default function CameraScreen() {
                       />
                     </TouchableOpacity>
 
-                    
+
                   </View>
                 </View>
 
@@ -377,6 +444,22 @@ export default function CameraScreen() {
                 console.log("Response:", tryonData);
 
                 if (!tryonResponse.ok) {
+                  // Check if it's a credit error
+                  if (tryonResponse.status === 403 && tryonData.available_tryons === 0) {
+                    setFlowState("CAPTURE");
+                    Alert.alert(
+                      "No Credits Available",
+                      "You've run out of try-ons! Purchase more credits to continue creating amazing virtual try-ons.",
+                      [
+                        { text: "Cancel", style: "cancel" },
+                        {
+                          text: "View Pricing",
+                          onPress: () => router.push("/pricing"),
+                        },
+                      ]
+                    );
+                    return;
+                  }
                   throw new Error(tryonData.error || "Virtual try-on failed");
                 }
 
@@ -387,6 +470,9 @@ export default function CameraScreen() {
                 const resultUrl = await pollJobStatus(tryonData.generated_image_id, token!);
 
                 console.log("✅ Virtual try-on completed!");
+
+                // Refresh credits after successful generation
+                await fetchUserCredits();
 
                 // Show the generated result
                 setGeneratedImages([resultUrl]);
@@ -516,6 +602,22 @@ export default function CameraScreen() {
             const tryonData = await tryonResponse.json();
 
             if (!tryonResponse.ok) {
+              // Check if it's a credit error
+              if (tryonResponse.status === 403 && tryonData.available_tryons === 0) {
+                setFlowState("CAPTURE");
+                Alert.alert(
+                  "No Credits Available",
+                  "You've run out of try-ons! Purchase more credits to continue creating amazing virtual try-ons.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "View Pricing",
+                      onPress: () => router.push("/pricing"),
+                    },
+                  ]
+                );
+                return;
+              }
               throw new Error(tryonData.message || "Virtual try-on failed");
             }
 
@@ -566,6 +668,9 @@ export default function CameraScreen() {
             const resultUrl = await pollJobStatus(tryonData.generated_image_id, token);
 
             console.log("✅ Virtual try-on completed!");
+
+            // Refresh credits after successful generation
+            await fetchUserCredits();
 
             // Show result
             setGeneratedImages([resultUrl]);

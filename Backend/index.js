@@ -265,7 +265,7 @@ app.post(
 app.get("/auth/me", verifyToken, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, created_at, available_tryons
+      `SELECT id, email, created_at, available_tryons, user_tier
        FROM users WHERE id = $1`,
       [req.userId]
     );
@@ -289,6 +289,7 @@ app.get("/auth/me", verifyToken, async (req, res) => {
         created_at: user.created_at,
         wardrobe_count: parseInt(wardrobeCount.rows[0].count),
         available_tryons: user.available_tryons || 0,
+        user_tier: user.user_tier || 'free',
       }
     });
   } catch (err) {
@@ -494,11 +495,13 @@ app.post(
           );
 
           // Decrement available try-ons
-          await pool.query(
-            `UPDATE users SET available_tryons = available_tryons - 1 WHERE id = $1`,
+          const updateResult = await pool.query(
+            `UPDATE users SET available_tryons = available_tryons - 1 WHERE id = $1 RETURNING available_tryons`,
             [req.userId]
           );
 
+          const remainingCredits = updateResult.rows[0]?.available_tryons || 0;
+          console.log(`💳 Credits decremented. Remaining: ${remainingCredits}`);
           console.log(`✅ Background processing completed in ${generationTime}ms`);
         } catch (bgError) {
           console.error(`❌ Background processing error:`, bgError);
@@ -1158,6 +1161,56 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
 
   } catch (err) {
     console.error("LINK UPLOAD ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Purchase credits endpoint (mock payment for now)
+app.post("/payment/purchase", verifyToken, async (req, res) => {
+  try {
+    const { package_id, amount, tryons } = req.body;
+
+    if (!package_id || !amount || !tryons) {
+      return res.status(400).json({
+        error: "Missing required fields: package_id, amount, tryons"
+      });
+    }
+
+    console.log(`💳 Processing purchase for user ${req.userId}: ${package_id} (${tryons} try-ons)`);
+
+    // Create payment order record
+    const orderId = uuidv4();
+    await pool.query(
+      `INSERT INTO payment_orders (id, user_id, package_id, amount, tryons, status, payment_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [orderId, req.userId, package_id, amount, tryons, 'completed', `mock-payment-${Date.now()}`]
+    );
+
+    // Update user credits and tier
+    const updateResult = await pool.query(
+      `UPDATE users
+       SET available_tryons = available_tryons + $1,
+           user_tier = 'paid'
+       WHERE id = $2
+       RETURNING available_tryons, user_tier`,
+      [tryons, req.userId]
+    );
+
+    const updatedUser = updateResult.rows[0];
+
+    console.log(`✅ Purchase successful! User now has ${updatedUser.available_tryons} try-ons (tier: ${updatedUser.user_tier})`);
+
+    res.json({
+      success: true,
+      message: "Purchase successful!",
+      order_id: orderId,
+      available_tryons: updatedUser.available_tryons,
+      user_tier: updatedUser.user_tier,
+    });
+
+  } catch (err) {
+    console.error("PURCHASE ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });

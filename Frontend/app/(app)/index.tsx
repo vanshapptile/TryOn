@@ -17,6 +17,7 @@ type GeneratedImage = {
 
 type UserCredits = {
   available_tryons: number;
+  user_tier?: string;
 };
 
 export default function HomeScreen() {
@@ -26,6 +27,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [credits, setCredits] = useState<UserCredits>({
     available_tryons: 0,
+    user_tier: 'free',
   });
 
   // Animations
@@ -86,6 +88,7 @@ export default function HomeScreen() {
         const userData = await creditsResponse.json();
         setCredits({
           available_tryons: userData.user.available_tryons || 0,
+          user_tier: userData.user.user_tier || 'free',
         });
       }
     } catch (error) {
@@ -147,7 +150,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Credits Badge */}
+        {/* Credits Badge - Show pricing for free users or when credits are 0 */}
         <Animated.View
           style={[
             styles.creditsBadgeContainer,
@@ -159,8 +162,13 @@ export default function HomeScreen() {
         >
           <TouchableOpacity
             style={styles.creditsBadge}
-            onPress={() => router.push("/pricing")}
-            activeOpacity={0.8}
+            onPress={() => {
+              // Show pricing if user is on free tier OR has 0 credits
+              if (credits.user_tier === 'free' || credits.available_tryons === 0) {
+                router.push("/pricing");
+              }
+            }}
+            activeOpacity={(credits.user_tier === 'free' || credits.available_tryons === 0) ? 0.8 : 1}
           >
             <View style={styles.creditsIconContainer}>
               <Ionicons name="diamond" size={24} color="#D4AF37" />
@@ -169,7 +177,9 @@ export default function HomeScreen() {
               <Text style={styles.creditsLabel}>Available Try-Ons</Text>
               <Text style={styles.creditsCount}>{credits.available_tryons}</Text>
             </View>
-            <Ionicons name="add-circle" size={28} color="#D4AF37" />
+            {(credits.user_tier === 'free' || credits.available_tryons === 0) && (
+              <Ionicons name="add-circle" size={28} color="#D4AF37" />
+            )}
           </TouchableOpacity>
         </Animated.View>
 

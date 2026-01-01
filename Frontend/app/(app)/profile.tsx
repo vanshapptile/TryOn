@@ -21,6 +21,8 @@ type UserData = {
   email: string;
   created_at: string;
   wardrobe_count: number;
+  available_tryons: number;
+  user_tier?: string;
 };
 
 export default function ProfileScreen() {
@@ -152,20 +154,24 @@ export default function ProfileScreen() {
           </BlurView>
         </View>
 
-        {/* Subscription Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Subscription</Text>
+        {/* Subscription Section - Show for free users or when credits are 0 */}
+        {userData && (userData.user_tier === 'free' || userData.available_tryons === 0) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Subscription</Text>
 
-          <TouchableOpacity onPress={() => router.push("/pricing")} activeOpacity={0.7}>
-            <BlurView intensity={20} tint="dark" style={styles.card}>
-              <View style={styles.cardItem}>
-                <Ionicons name="diamond-outline" size={20} color="#FFC107" />
-                <Text style={styles.cardLabel}>Pricing Plans</Text>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
-              </View>
-            </BlurView>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity onPress={() => router.push("/pricing")} activeOpacity={0.7}>
+              <BlurView intensity={20} tint="dark" style={styles.card}>
+                <View style={styles.cardItem}>
+                  <Ionicons name="diamond-outline" size={20} color="#FFC107" />
+                  <Text style={styles.cardLabel}>
+                    {userData.user_tier === 'free' ? 'View Pricing Plans' : 'Get More Try-Ons'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
+                </View>
+              </BlurView>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Support Section */}
         <View style={styles.section}>

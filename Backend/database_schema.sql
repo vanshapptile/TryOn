@@ -36,6 +36,10 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_path TEXT;
 -- New users get 3 free try-ons by default
 ALTER TABLE users ADD COLUMN IF NOT EXISTS available_tryons INTEGER DEFAULT 3;
 
+-- Add user tier column to track if user has ever purchased credits
+-- 'free' = never purchased, 'paid' = has purchased at least once
+ALTER TABLE users ADD COLUMN IF NOT EXISTS user_tier VARCHAR(20) DEFAULT 'free';
+
 -- Table for tracking payment orders
 CREATE TABLE IF NOT EXISTS payment_orders (
   id VARCHAR(255) PRIMARY KEY,  -- Razorpay order ID
