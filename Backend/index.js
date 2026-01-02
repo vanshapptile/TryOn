@@ -1166,56 +1166,6 @@ app.post("/wardrobe/link", verifyToken, async (req, res) => {
 });
 
 
-// Purchase credits endpoint (mock payment for now)
-app.post("/payment/purchase", verifyToken, async (req, res) => {
-  try {
-    const { package_id, amount, tryons } = req.body;
-
-    if (!package_id || !amount || !tryons) {
-      return res.status(400).json({
-        error: "Missing required fields: package_id, amount, tryons"
-      });
-    }
-
-    console.log(`💳 Processing purchase for user ${req.userId}: ${package_id} (${tryons} try-ons)`);
-
-    // Create payment order record
-    const orderId = uuidv4();
-    await pool.query(
-      `INSERT INTO payment_orders (id, user_id, package_id, amount, tryons, status, payment_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [orderId, req.userId, package_id, amount, tryons, 'completed', `mock-payment-${Date.now()}`]
-    );
-
-    // Update user credits and tier
-    const updateResult = await pool.query(
-      `UPDATE users
-       SET available_tryons = available_tryons + $1,
-           user_tier = 'paid'
-       WHERE id = $2
-       RETURNING available_tryons, user_tier`,
-      [tryons, req.userId]
-    );
-
-    const updatedUser = updateResult.rows[0];
-
-    console.log(`✅ Purchase successful! User now has ${updatedUser.available_tryons} try-ons (tier: ${updatedUser.user_tier})`);
-
-    res.json({
-      success: true,
-      message: "Purchase successful!",
-      order_id: orderId,
-      available_tryons: updatedUser.available_tryons,
-      user_tier: updatedUser.user_tier,
-    });
-
-  } catch (err) {
-    console.error("PURCHASE ERROR:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
 // For Testing - Generate a test token without database
 app.get("/auth/dev-token", async (req, res) => {
   if (process.env.NODE_ENV !== "development") {

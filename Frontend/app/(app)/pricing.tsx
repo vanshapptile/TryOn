@@ -5,14 +5,11 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../../src/theme/colors";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useState } from "react";
 
 type PricingTier = {
   id: string;
@@ -45,9 +42,7 @@ const PRICING_TIERS: PricingTier[] = [
 ];
 
 export default function PricingScreen() {
-  const [loading, setLoading] = useState(false);
-
-  const handleSelectPlan = async (tier: PricingTier) => {
+  const handleSelectPlan = (tier: PricingTier) => {
     if (tier.id === "free") {
       Alert.alert(
         "Free Tier",
@@ -57,78 +52,16 @@ export default function PricingScreen() {
       return;
     }
 
-    // Confirm purchase
+    // Show coming soon message for paid tiers
     Alert.alert(
-      "Confirm Purchase",
-      `Purchase ${tier.name} for ₹${tier.price}?\n\nYou'll get ${tier.tryons} try-ons.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Purchase",
-          onPress: () => processPurchase(tier),
-        },
-      ]
+      "Coming Soon! 🚀",
+      "In-app purchases are coming soon.\n\nStay tuned for updates!",
+      [{ text: "OK" }]
     );
-  };
-
-  const processPurchase = async (tier: PricingTier) => {
-    try {
-      setLoading(true);
-
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
-        Alert.alert("Error", "Please sign in to purchase credits");
-        router.replace("/signin");
-        return;
-      }
-
-      const response = await fetch("https://api.tryonapp.in/payment/purchase", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          package_id: tier.id,
-          amount: tier.price,
-          tryons: tier.tryons,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Purchase failed");
-      }
-
-      Alert.alert(
-        "Purchase Successful! 🎉",
-        `You now have ${data.available_tryons} try-ons available!\n\nStart creating amazing virtual try-ons.`,
-        [
-          {
-            text: "Start Creating",
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error("Purchase error:", error);
-      Alert.alert("Purchase Failed", error.message || "Could not complete purchase. Please try again.");
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#D4AF37" />
-          <Text style={styles.loadingText}>Processing purchase...</Text>
-        </View>
-      )}
-
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -211,23 +144,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
-  },
-  loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 1000,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    fontWeight: "600",
   },
   header: {
     flexDirection: "row",
